@@ -237,20 +237,27 @@ SYSCALL_KRETPROBE(bpf) {
     return handle_bpf_ret(ctx);
 }
 
+//作用：将 BPF 程序添加到内核的符号表
+//目的：捕获新加载的BPF程序的ID， 监控系统中BPF程序的加载行为
+//通过获取程序的 ID，可以追踪 BPF 程序的生命周期
 SEC("kprobe/bpf_prog_kallsyms_add")
 int kprobe_bpf_prog_kallsyms_add(struct pt_regs *ctx) {
+    // 获取当前进程的pid和线程组id，高 32 位是 TGID，低 32 位是 PID
     u64 pid_tgid = bpf_get_current_pid_tgid();
     struct bpf_syscall_t *bpf = bpf_map_lookup_elem(&bpf_cache, &pid_tgid);
     if (bpf == NULL)
         return 0;
 
+    //获取第一个参数，并将其转化为 bpf_prog 结构体指针
     struct bpf_prog *prog = (struct bpf_prog *) PT_REGS_PARM1(ctx);
     struct bpf_prog_aux *prog_aux;
+    //安全的读取 prog->aux 到 prog_aux 中
     int res = bpf_probe_read(&prog_aux, sizeof(prog_aux), &prog->aux);
     if (res != 0) {
         bpf_printk("bpf_probe_read for prog_aux failed: %d\n", res);
     }
 
+    //从prog_aux->id中读取程序的 ID
     u32 id;
     res = bpf_probe_read(&id, sizeof(id), &prog_aux->id);
     if (res != 0) {
@@ -262,21 +269,29 @@ int kprobe_bpf_prog_kallsyms_add(struct pt_regs *ctx) {
     return 0;
 }
 
+//bpf_map_new_fd是用于创建新的 BPF map 的函数
+//目的：捕获新加载的BPF map的ID， 监控系统中BPF map的创建行为
 SEC("kprobe/bpf_map_new_fd")
 int kprobe_bpf_map_new_fd(struct pt_regs *ctx) {
+    // 获取当前进程的 PID 和线程组 ID
     u64 pid_tgid = bpf_get_current_pid_tgid();
+    
+    // 查找该进程的 BPF 系统调用上下文
     struct bpf_syscall_t *bpf = bpf_map_lookup_elem(&bpf_cache, &pid_tgid);
     if (bpf == NULL)
         return 0;
 
+    // 获取 map 结构体指针（第一个参数）
     struct bpf_map *map = (struct bpf_map *) PT_REGS_PARM1(ctx);
 
+    // 读取 map 的 ID
     u32 id;
     int res = bpf_probe_read(&id, sizeof(id), &map->id);
     if (res != 0) {
         bpf_printk("bpf_probe_read for map id failed: %d\n", res);
     }
 
+    // 保存 map ID
     bpf->id = id;
     bpf_printk("map id %d\n", id);
     return 0;
