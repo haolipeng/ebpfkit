@@ -8,6 +8,7 @@
 #ifndef _TCP_CHECK_H_
 #define _TCP_CHECK_H_
 
+//计算tcp校验和
 __attribute__((always_inline)) void xdp_compute_tcp_csum(struct xdp_md *ctx, struct cursor *c, struct pkt_ctx_t *pkt) {
     xdp_cursor_init(c, ctx);
     if (!(pkt->eth = parse_ethhdr(c)))

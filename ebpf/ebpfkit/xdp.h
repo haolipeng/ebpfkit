@@ -8,12 +8,14 @@
 #ifndef _XDP_H_
 #define _XDP_H_
 
+//xdp/ingress_dispatch 钩子是 XDP中的一个关键点,位于网络数据包进入内核网络栈的入口处。
 SEC("xdp/ingress_dispatch")
 int xdp_ingress_dispatch(struct xdp_md *ctx) {
     struct cursor c;
     struct pkt_ctx_t pkt;
     int ret = parse_xdp_packet(ctx, &c, &pkt);
     if (ret < 0) {
+        //放行数据包
         return XDP_PASS;
     }
 
@@ -34,6 +36,7 @@ int xdp_ingress_dispatch(struct xdp_md *ctx) {
             break;
     }
 
+    //默认放行数据包
     return XDP_PASS;
 }
 
